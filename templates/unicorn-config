@@ -1,0 +1,19 @@
+# Set the working application directory
+working_directory "{{ app_path }}"
+
+# Unicorn PID file location
+pid "/tmp/unicorn.{{ app_name }}.pid"
+
+# Path to logs
+stderr_path "/tmp/unicorn.{{ app_name }}.log"
+stdout_path "/tmp/unicorn.{{ app_name }}.log"
+
+# Unicorn socket
+listen "/tmp/unicorn.{{ app_name }}.sock"
+
+# Number of processes
+worker_processes 2
+
+# Time-out
+timeout 30
+

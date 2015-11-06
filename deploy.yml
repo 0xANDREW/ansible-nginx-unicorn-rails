@@ -1,0 +1,84 @@
+---
+- hosts: test
+  remote_user: deployer
+  vars:
+
+    # TODO: how to access actual `remote_user` variable instead of 
+    # defining twice?
+    remote_user: deployer
+
+    rbenv_url: https://github.com/sstephenson/rbenv.git
+    rbenv_path: '/home/{{ remote_user }}/.rbenv'
+    ruby_build_url: https://github.com/sstephenson/ruby-build.git
+    ruby_build_path: '{{ rbenv_path }}/plugins/ruby-build'
+    ruby: '{{ rbenv_path }}/shims/ruby'
+    ruby_version: 2.2.3
+    ruby_path: '{{ rbenv_path }}/versions/{{ ruby_version }}'
+    ruby_bin: '{{ ruby_path }}/bin'
+    gem_install: '{{ ruby_path }}/bin/gem install --no-document'
+
+    app_name: feedfm-deploy-test
+    app_path: '/home/{{ remote_user }}/{{ app_name }}'
+    app_git_url: git@github.com:0xANDREW/ansible-deploy-test.git
+    app_env: production
+
+  tasks:
+
+    # Packages
+    - { apt: name=git, sudo: yes }
+    - { apt: name=nginx, sudo: yes }
+    - { apt: name=libssl-dev, sudo: yes }
+    - { apt: name=zlib1g-dev, sudo: yes }
+    - { apt: name=libsqlite3-dev, sudo: yes }
+    - { apt: name=build-essential, sudo: yes }
+    - { apt: name=libreadline-dev, sudo: yes }
+
+    # rbenv
+    - shell: 'ls {{ rbenv_path }}/versions | grep {{ ruby_version }}'
+      register: check_ruby
+      ignore_errors: yes
+    - git: repo={{ rbenv_url }} dest={{ rbenv_path }} accept_hostkey=yes 
+    - git: repo={{ ruby_build_url }} dest={{ ruby_build_path }}
+    - template: src=templates/bash_profile dest=/home/{{ remote_user }}/.bash_profile
+    - shell: '{{ rbenv_path }}/bin/rbenv install {{ ruby_version }}'
+      when: check_ruby.stdout != ruby_version
+    - shell: '{{ rbenv_path }}/bin/rbenv global {{ ruby_version }}'
+    
+    # nginx site template
+    - { template: src=templates/nginx-default 
+      dest=/etc/nginx/sites-available/default force=yes, sudo: yes }
+    - { file: src=/etc/nginx/sites-available/default state=link
+      dest=/etc/nginx/sites-enabled/default force=yes, sudo: yes }
+
+    # Pull app source from git
+    - file: path={{ app_path }} state=absent
+    - git: repo={{ app_git_url }} dest={{ app_path }} accept_hostkey=yes force=yes
+
+    # Put Unicorn config
+    - template: src=templates/unicorn-config dest={{ app_path }}/config/unicorn.rb force=yes
+    
+    # Install bundle
+    - shell: '{{ gem_install }} bundler'
+    - shell: '{{ ruby_bin }}/bundle install'
+      args:
+        chdir: '{{ app_path }}'
+
+    # TODO: rake doesn't work right on some environments
+    # Migrate DB
+    #    - shell: '{{ ruby_bin }}/rake db:migrate RAILS_ENV={{ app_env }}'
+    #      args:
+    #        chdir: '{{ app_path }}'
+  
+    # Start/restart Unicorn
+    - shell: 'cat /tmp/unicorn.{{ app_name }}.pid'
+      register: unicorn_pid
+      ignore_errors: yes
+    - shell: 'kill {{ unicorn_pid.stdout }}'
+      when: unicorn_pid.stdout != ''
+
+    # Must eval rbenv init to load gem paths
+    - shell: 'eval "$({{ rbenv_path }}/bin/rbenv init -)"; {{ ruby_bin }}/unicorn_rails -c {{ app_path }}/config/unicorn.rb -D'
+
+    # Restart nginx
+    - { service: name=nginx state=restarted, sudo: yes }
+
