@@ -17,7 +17,7 @@
     ruby_bin: '{{ ruby_path }}/bin'
     gem_install: '{{ ruby_path }}/bin/gem install --no-document'
 
-    app_name: feedfm-deploy-test
+    app_name: ansible-deploy-test
     app_path: '/home/{{ remote_user }}/{{ app_name }}'
     app_git_url: git@github.com:0xANDREW/ansible-deploy-test.git
     app_env: production
