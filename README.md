@@ -1,10 +1,12 @@
 # ansible-nginx-unicorn-rails
 Ansible playbook for deploying Rails with Unicorn on nginx on Ubuntu
 
-## Assumptions
+## Notes
 - `remote_user` does everything: checkout, deploy, etc.
 - single `nginx` Rails app
 - `unicorn` socket and PID locations (see `templates/unicorn-config`)
+- clobbers `remote_user`'s `.bash_profile`
+- clobbers the repo's `config/unicorn.rb` in favor of a template (see `templates/unicorn-config`)
 
 ## Vars
 `remote_user`: deploying user, needs somewhat permissive `sudo`
@@ -35,9 +37,9 @@ Ansible playbook for deploying Rails with Unicorn on nginx on Ubuntu
 
 `app_env`: Rails environment name for your app
 
-## NOTES
-- really only works with a single Rails app as the default `nginx` site is clobbered
-- clobbers `remote_user`'s `.bash_profile`
-- clobbers the repo's `config/unicorn.rb` in favor of a template (see `templates/unicorn-config`)
-- `rake` stuff isn't working at the moment (no migrations)
+## TODO
+- `rake` stuff isn't working at the moment (no automatic migrations)
+- release history
+- non-SQLite databases
+
 
